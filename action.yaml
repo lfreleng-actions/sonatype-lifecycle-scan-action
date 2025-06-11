@@ -2,36 +2,136 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 The Linux Foundation
 
-# actions-template
-name: "🛠️ Actions Template"
-description: "Description of action"
-# Any relevant notes/observations can go here
+# sonatype-lifecycle-scan-action
+name: '🔍 Sonatype Lifecycle Scan'
+description: 'Runs a Sonatype Lifecycle (Nexus IQ) scan'
 
 inputs:
-  input:
-    description: "Description of input"
-    required: true
+  # Note: types are not enforced for composite actions and fail schema checks
+  # But are useful for documentation purposes and will be commented out
 
-outputs:
-  output:
-    description: "Description of output"
-    value: ${{ steps.code.outputs.output }}
+  # Mandatory
+  nexus_iq_server:
+    description: 'Nexus IQ Server URL'
+    required: true
+    # type: string
+  nexus_iq_username:
+    description: 'Nexus IQ Username'
+    required: true
+    # type: string
+  nexus_iq_password:
+    description: 'Nexus IQ Password'
+    required: true
+    # type: string
+
+  # Optional
+  java_distribution:
+    description: 'JAVA SE distribution to setup/run for Nexus CLI tool'
+    required: false
+    default: 'temurin'
+    # type: string
+  java_version:
+    description: 'Java runtime to setup/run for Nexus CLI tool'
+    required: false
+    default: '17'
+    # type: number
+  iq_cli_version:
+    description: 'Specific version of Nexus CLI to setup/run'
+    required: false
+    default: '2.4.2-01'
+    # type: string
+  application_id:
+    description: 'Organisation and project name in Nexus IQ'
+    required: false
+    # yamllint disable-line rule:line-length
+    default: "${{ github.repository_owner }}-${{ github.event.repository.name }}"
+    # type: string
+  scan_targets:
+    description: 'Location of file(s) or folder(s) to scan'
+    required: false
+    default: '.'
+    # type: string
+  debug:
+    description: 'Enable debugging output'
+    required: false
+    default: 'false'
+    # type: boolean
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
-    - name: "Friendly Name"
-      id: code
+    - name: 'Check action inputs/environment'
       shell: bash
       run: |
-        # Friendly Name
-        input="${{ inputs.input }}"
-        if [ -z "$input" ]; then
-          echo "Error: mandatory input was not set/configured ❌"
+        # Check action inputs/environment
+        echo "Java Distribution: ${{ inputs.java_distribution }}"
+        echo "Java Version: ${{ inputs.java_version }}"
+        echo "IQ CLI Version: ${{ inputs.iq_cli_version }}"
+        echo "Application ID: ${{ inputs.application_id }}"
+        echo "Scan Targets: ${{ inputs.scan_targets }}"
+        echo "Debug Mode: ${{ inputs.debug }}"
+
+        echo "Verifying mandatory inputs 💬"
+        # Check mandatory parameters
+        if [ -n "${{ inputs.nexus_iq_server }}" ]; then
+          echo "Nexus IQ Server: ${{ inputs.nexus_iq_server }}"
+        else
+          echo "Nexus IQ Server not provided as input"
+          error='true'
+        fi
+        if [ -n "${{ inputs.nexus_iq_username }}" ]; then
+          echo "Nexus IQ Username: ${{ inputs.nexus_iq_username }}"
+        else
+          echo "Nexus IQ Username not provided as input"
+          error='true'
+        fi
+        if [ -n "${{ inputs.nexus_iq_password }}" ]; then
+          echo "Nexus IQ Password: [REDACTED]"
+        else
+          echo "Nexus IQ Password not provided as input"
+          error='true'
+        fi
+        if [ "$error" = 'true' ]; then
+          echo "Error: one or more mandatory inputs are missing"
+          echo "Check variables/secrets are set in Org/repository"
+          echo "Provide all required inputs to the action ❌"
           exit 1
+        else
+          echo "All mandatory inputs provided ✅"
         fi
 
-        echo "output=$input" >> "$GITHUB_ENV"
-        echo "output=$input" >> "$GITHUB_OUTPUT"
-        echo "Action received: $input ✅"
-        echo "Action received: $input ✅" >> "$GITHUB_STEP_SUMMARY"
+    - name: 'Setup Sonatype CLI'
+      # yamllint disable-line rule:line-length
+      uses: sonatype/actions/setup-iq-cli@2464d8cc1d12f80ba0b5ba8f9d85ac258556a39e # v.1.4.3
+      with:
+        iq-cli-version: ${{ inputs.iq_cli_version }}
+
+    # Sonatype CLI requires Java to run
+    - name: 'Setup Java'
+      # yamllint disable-line rule:line-length
+      uses: actions/setup-java@17f84c3641ba7b8f6deff6309fc4c864478f5d62 # v3.14.1
+      with:
+        distribution: ${{ inputs.java_distribution }}
+        java-version: ${{ inputs.java_version }}
+
+    - name: 'Debug action/environment'
+      if: inputs.debug == 'true'
+      shell: bash
+      run: |
+        # Show local directory context
+        echo "Debug logging enabled 🐞"
+        echo "Current directory: $(pwd)"
+        echo "GitHub workspace: ${{ github.workspace }}"
+        echo "Directory content:"
+        ls -la
+
+    - name: 'Run Sonatype CLI'
+      # yamllint disable-line rule:line-length
+      uses: sonatype/actions/run-iq-cli@2464d8cc1d12f80ba0b5ba8f9d85ac258556a39e # v1.4.3
+      with:
+        iq-server-url: ${{ inputs.nexus_iq_server }}
+        username: ${{ inputs.nexus_iq_username }}
+        password: ${{ inputs.nexus_iq_password }}
+        application-id: ${{ inputs.application_id }}
+        scan-targets: ${{ inputs.scan_targets }}
+        debug: ${{ inputs.debug }}
