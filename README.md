@@ -1,13 +1,13 @@
 <!--
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: 2025 The Linux Foundation
+SPDX-License-Identifier: Apache-2.0
+SPDX-FileCopyrightText: 2025 The Linux Foundation
 -->
 
-# 🛠️ Template Action
+# 🔍 Sonatype Lifecycle Scan
 
-This is a template for the other actions in this Github organisation.
+Runs a Sonatype Lifecycle (Nexus IQ) scan.
 
-## actions-template
+## sonatype-lifecycle-scan-action
 
 ## Usage Example
 
@@ -15,11 +15,11 @@ This is a template for the other actions in this Github organisation.
 
 ```yaml
 steps:
-  - name: "Action template"
-    id: action-template
-    uses: lfreleng-actions/actions-template@main
+  - name: "Sonatype Lifecycle Scan"
+    uses: lfreleng-actions/sonatype-lifecycle-scan-action@main
     with:
-      input: "placeholder"
+      nexus_iq_password: ${{ secrets.nexus_iq_password }}
+      scan_targets: 'my-project-folder'
 ```
 
 <!-- markdownlint-enable MD046 -->
@@ -28,22 +28,30 @@ steps:
 
 <!-- markdownlint-disable MD013 -->
 
-| Name          | Required | Description  |
-| ------------- | -------- | ------------ |
-| input         | False    | Action input |
+| Name              | Required | Default  | Description                                          |
+| ----------------- | -------- | -------- | ---------------------------------------------------- |
+| nexus_iq_server   | True     |          | Nexus IQ Server URL                                  |
+| nexus_iq_username | True     |          | Nexus IQ USERNAME                                    |
+| nexus_iq_password | True     |          | Nexus IQ Password                                    |
+| java_distribution | False    | temurin  | JAVA SE distribution to setup/run for Nexus CLI tool |
+| java_version      | False    | 17       | Java runtime to setup/run for Nexus CLI tool         |
+| iq_cli_version    | False    | 2.4.2-01 | Specific version of Nexus CLI to setup/run           |
+| application_id    | False    |          | Organisation and project name in Nexus IQ            |
+| scan_targets      | False    | .        | Location of file(s) or folder(s) to scan             |
+| debug             | False    | false    | Enable debugging output                              |
 
 <!-- markdownlint-enable MD013 -->
 
-## Outputs
+### Required Inputs
 
-<!-- markdownlint-disable MD013 -->
+For the mandatory inputs, create the following Github variables at the
+organisation level so that all repositories can use them:
 
-| Name          | Description   |
-| ------------- | ------------- |
-| output        | Action output |
+- NEXUS_IQ_SERVER
+- NEXUS_IQ_USERNAME
 
-<!-- markdownlint-enable MD013 -->
+Also, the following secret:
 
-## Implementation Details
+- NEXUS_IQ_PASSWORD
 
-## Notes
+Pass the values of these variables to the action from the calling workflow.
