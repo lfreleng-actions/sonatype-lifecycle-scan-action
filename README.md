@@ -38,6 +38,7 @@ steps:
 | iq_cli_version    | False    | 2.4.2-01 | Specific version of Nexus CLI to setup/run           |
 | application_id    | False    |          | Organisation and project name in Nexus IQ            |
 | scan_targets      | False    | .        | Location of file(s) or folder(s) to scan             |
+| no_checkout       | False    | false    | Do not checkout local repository; used for testing   |
 | debug             | False    | false    | Enable debugging output                              |
 
 <!-- markdownlint-enable MD013 -->
