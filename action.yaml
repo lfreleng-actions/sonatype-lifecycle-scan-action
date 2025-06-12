@@ -120,6 +120,11 @@ runs:
         distribution: ${{ inputs.java_distribution }}
         java-version: ${{ inputs.java_version }}
 
+    - name: 'Checkout repository'
+      # yamllint disable-line rule:line-length
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      if: inputs.no_checkout != 'true'
+
     - name: 'Debug action/environment'
       if: inputs.debug == 'true'
       shell: bash
@@ -130,11 +135,6 @@ runs:
         echo "GitHub workspace: ${{ github.workspace }}"
         echo "Directory content:"
         ls -la
-
-    - name: 'Checkout repository'
-      # yamllint disable-line rule:line-length
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      if: inputs.no_checkout != 'true'
 
     - name: 'Run Sonatype CLI'
       # yamllint disable-line rule:line-length
