@@ -108,7 +108,7 @@ runs:
 
     - name: 'Setup Sonatype CLI'
       # yamllint disable-line rule:line-length
-      uses: sonatype/actions/setup-iq-cli@761de36d3d4a3ad414385f6b96e635438f1de664 # v.1.11.1
+      uses: sonatype/actions/setup-iq-cli@3bec72e6daf541cf541636e4493212c2fcf0a149 # v.1.12.0
       with:
         iq-cli-version: ${{ inputs.iq_cli_version }}
 
@@ -138,7 +138,7 @@ runs:
 
     - name: 'Run Sonatype CLI'
       # yamllint disable-line rule:line-length
-      uses: sonatype/actions/run-iq-cli@761de36d3d4a3ad414385f6b96e635438f1de664 # v1.11.1
+      uses: sonatype/actions/run-iq-cli@3bec72e6daf541cf541636e4493212c2fcf0a149 # v1.12.0
       with:
         iq-server-url: ${{ inputs.nexus_iq_server }}
         username: ${{ inputs.nexus_iq_username }}
