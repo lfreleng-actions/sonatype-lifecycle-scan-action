@@ -68,30 +68,40 @@ runs:
   steps:
     - name: 'Check action inputs/environment'
       shell: bash
+      env:
+        JAVA_DISTRIBUTION: ${{ inputs.java_distribution }}
+        JAVA_VERSION: ${{ inputs.java_version }}
+        IQ_CLI_VERSION: ${{ inputs.iq_cli_version }}
+        APPLICATION_ID: ${{ inputs.application_id }}
+        SCAN_TARGETS: ${{ inputs.scan_targets }}
+        DEBUG: ${{ inputs.debug }}
+        NEXUS_IQ_SERVER: ${{ inputs.nexus_iq_server }}
+        NEXUS_IQ_USERNAME: ${{ inputs.nexus_iq_username }}
+        NEXUS_IQ_PASSWORD: ${{ inputs.nexus_iq_password }}
       run: |
         # Check action inputs/environment
-        echo "Java Distribution: ${{ inputs.java_distribution }}"
-        echo "Java Version: ${{ inputs.java_version }}"
-        echo "IQ CLI Version: ${{ inputs.iq_cli_version }}"
-        echo "Application ID: ${{ inputs.application_id }}"
-        echo "Scan Targets: ${{ inputs.scan_targets }}"
-        echo "Debug Mode: ${{ inputs.debug }}"
+        echo "Java Distribution: $JAVA_DISTRIBUTION"
+        echo "Java Version: $JAVA_VERSION"
+        echo "IQ CLI Version: $IQ_CLI_VERSION"
+        echo "Application ID: $APPLICATION_ID"
+        echo "Scan Targets: $SCAN_TARGETS"
+        echo "Debug Mode: $DEBUG"
 
         echo "Verifying mandatory inputs 💬"
         # Check mandatory parameters
-        if [ -n "${{ inputs.nexus_iq_server }}" ]; then
-          echo "Nexus IQ Server: ${{ inputs.nexus_iq_server }}"
+        if [ -n "$NEXUS_IQ_SERVER" ]; then
+          echo "Nexus IQ Server: $NEXUS_IQ_SERVER"
         else
           echo "Nexus IQ Server not provided as input"
           error='true'
         fi
-        if [ -n "${{ inputs.nexus_iq_username }}" ]; then
-          echo "Nexus IQ Username: ${{ inputs.nexus_iq_username }}"
+        if [ -n "$NEXUS_IQ_USERNAME" ]; then
+          echo "Nexus IQ Username: $NEXUS_IQ_USERNAME"
         else
           echo "Nexus IQ Username not provided as input"
           error='true'
         fi
-        if [ -n "${{ inputs.nexus_iq_password }}" ]; then
+        if [ -n "$NEXUS_IQ_PASSWORD" ]; then
           echo "Nexus IQ Password: [REDACTED]"
         else
           echo "Nexus IQ Password not provided as input"
@@ -128,11 +138,13 @@ runs:
     - name: 'Debug action/environment'
       if: inputs.debug == 'true'
       shell: bash
+      env:
+        GITHUB_WORKSPACE_DIR: ${{ github.workspace }}
       run: |
         # Show local directory context
         echo "Debug logging enabled 🐞"
         echo "Current directory: $(pwd)"
-        echo "GitHub workspace: ${{ github.workspace }}"
+        echo "GitHub workspace: $GITHUB_WORKSPACE_DIR"
         echo "Directory content:"
         ls -la
 
