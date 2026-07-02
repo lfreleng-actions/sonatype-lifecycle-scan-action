@@ -24,29 +24,35 @@ jobs:
   tests:
     name: 'Test local GitHub Action'
     runs-on: 'ubuntu-latest'
+    # Run this job in a dedicated environment so its execution and any
+    # environment-scoped secrets can be gated by environment protection
+    # rules (satisfies zizmor's secrets-outside-env).
+    environment: 'development'
     permissions:
       contents: read
     timeout-minutes: 10 # Increase this timeout value as needed
     steps:
       - name: 'Checkout repository'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: 'Test vars/secrets are available'
         run: |
           # Test vars/secrets are available
-          if [ -n "${{ vars.NEXUS_IQ_SERVER }}" ]; then
-            echo "NEXUS_IQ_SERVER: ${{ vars.NEXUS_IQ_SERVER }}"
+          if [ -n "${VARS_NEXUS_IQ_SERVER}" ]; then
+            echo "NEXUS_IQ_SERVER: ${VARS_NEXUS_IQ_SERVER}"
           else
             echo "NEXUS_IQ_SERVER is not available"
             error='true'
           fi
-          if [ -n "${{ vars.NEXUS_IQ_USERNAME }}" ]; then
-            echo "NEXUS_IQ_USERNAME: ${{ vars.NEXUS_IQ_USERNAME }}"
+          if [ -n "${VARS_NEXUS_IQ_USERNAME}" ]; then
+            echo "NEXUS_IQ_USERNAME: ${VARS_NEXUS_IQ_USERNAME}"
           else
             echo "NEXUS_IQ_USERNAME is not available"
             error='true'
           fi
-          if [ -n "${{ secrets.NEXUS_IQ_PASSWORD }}" ]; then
+          if [ -n "${SECRET_NEXUS_IQ_PASSWORD}" ]; then
             echo "NEXUS_IQ_PASSWORD is set"
           else
             echo "NEXUS_IQ_PASSWORD is not available"
@@ -59,6 +65,10 @@ jobs:
           else
             echo "All mandatory variables/secrets are available ✅"
           fi
+        env:
+          VARS_NEXUS_IQ_SERVER: ${{ vars.NEXUS_IQ_SERVER }}
+          VARS_NEXUS_IQ_USERNAME: ${{ vars.NEXUS_IQ_USERNAME }}
+          SECRET_NEXUS_IQ_PASSWORD: ${{ secrets.NEXUS_IQ_PASSWORD }}
 
       - name: "Running local action: ${{ github.repository }}"
         uses: ./
