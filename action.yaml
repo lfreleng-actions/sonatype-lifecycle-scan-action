@@ -43,8 +43,31 @@ inputs:
   iq_cli_version:
     description: 'Specific version of Nexus CLI to setup/run'
     required: false
-    # default: '2.4.2-01'
-    default: 'latest'
+    # Note: the 'latest' alias resolves to the version embedded in the
+    # sonatype/actions release and can lag behind the current CLI
+    default: '2.13.0-01'
+    # type: string
+  ignore_scanning_errors:
+    description: 'Ignore scanning errors (invalid/inaccessible files)'
+    required: false
+    default: 'false'
+    # type: boolean
+  ignore_system_errors:
+    description: 'Ignore system errors (IO, network, server, etc.)'
+    required: false
+    default: 'false'
+    # type: boolean
+  fail_on_policy_warnings:
+    description: 'Fail the scan when policy evaluation warnings occur'
+    required: false
+    default: 'false'
+    # type: boolean
+  advanced_properties:
+    description: >-
+      System properties passed to the Nexus IQ CLI; accepts multiple
+      key=value pairs, space-separated or one per line
+    required: false
+    default: ''
     # type: string
   application_id:
     description: 'Organisation and project name in Nexus IQ'
@@ -159,4 +182,8 @@ runs:
         password: ${{ inputs.nexus_iq_password }}
         application-id: ${{ inputs.application_id }}
         scan-targets: ${{ inputs.scan_targets }}
+        ignore-scanning-errors: ${{ inputs.ignore_scanning_errors }}
+        ignore-system-errors: ${{ inputs.ignore_system_errors }}
+        fail-on-policy-warnings: ${{ inputs.fail_on_policy_warnings }}
+        advanced-properties: ${{ inputs.advanced_properties }}
         debug: ${{ inputs.debug }}
