@@ -73,6 +73,33 @@ break the value into separate tokens. To keep invalid files from
 failing the scan without excluding them, set
 `ignore_scanning_errors: 'true'` instead.
 
+### Workspace Variables in Inputs
+
+The `advanced_properties` and `scan_targets` inputs expand a fixed
+list of names before the Nexus IQ CLI runs:
+
+`GITHUB_WORKSPACE`, `GITHUB_REPOSITORY`, `GITHUB_REF_NAME`,
+`GITHUB_SHA`, `GITHUB_RUN_ID`, `RUNNER_TEMP`, `RUNNER_OS`
+
+Both the `${NAME}` and `$NAME` forms work:
+
+```yaml
+advanced_properties: |
+  dirExcludes=${GITHUB_WORKSPACE}/generated/**
+```
+
+Every other `${...}` reaches the CLI as written, and a name outside
+the list stays literal even where the environment holds a value for
+it: the step's environment can hold credentials, and an open
+substitution would put one in a CLI argument. Nothing in the expansion
+executes, so `$(...)`, backticks and `$((...))` reach the CLI as
+written too. The same expansion, with the same name list, applies to
+the argument inputs of [maven-build-action][mba] and
+[sonarqube-cloud-scan-action][scsa].
+
+[mba]: https://github.com/lfreleng-actions/maven-build-action
+[scsa]: https://github.com/lfreleng-actions/sonarqube-cloud-scan-action
+
 ### Required Inputs
 
 For the mandatory inputs, create the following Github variables at the

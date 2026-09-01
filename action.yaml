@@ -65,7 +65,10 @@ inputs:
   advanced_properties:
     description: >-
       System properties passed to the Nexus IQ CLI; accepts multiple
-      key=value pairs, space-separated or one per line
+      key=value pairs, space-separated or one per line. References to
+      GITHUB_WORKSPACE, GITHUB_REPOSITORY, GITHUB_REF_NAME, GITHUB_SHA,
+      GITHUB_RUN_ID, RUNNER_TEMP or RUNNER_OS expand before the CLI
+      runs; every other ${...} reaches the CLI as written
     required: false
     default: ''
     # type: string
@@ -76,7 +79,10 @@ inputs:
     default: "${{ github.repository_owner }}-${{ github.event.repository.name }}"
     # type: string
   scan_targets:
-    description: 'Location of file(s) or folder(s) to scan'
+    description: >-
+      Location of file(s) or folder(s) to scan. Workspace variable
+      references expand the same way as in advanced_properties; see
+      that input's description
     required: false
     default: '.'
     # type: string
@@ -173,6 +179,67 @@ runs:
         echo "Directory content:"
         ls -la
 
+    - name: 'Expand workspace variables'
+      id: expand
+      shell: bash
+      env:
+        ADVANCED_PROPERTIES: ${{ inputs.advanced_properties }}
+        SCAN_TARGETS: ${{ inputs.scan_targets }}
+      run: |
+        # Expand workspace variable references in the CLI inputs
+        set -euo pipefail
+        # Jenkins expanded $WORKSPACE in a shell before the CLI started;
+        # nothing on this path re-expands ${...} inside an input value,
+        # so restore that pass here with the same allowlisted expansion
+        # maven-build-action and sonarqube-cloud-scan-action apply to
+        # their argument inputs. Nothing in it executes: $(...),
+        # backticks and $((...)) reach the CLI as written, and names
+        # outside the allowlist stay literal, credentials among them.
+        # shellcheck source=expand-workspace-vars.sh
+        . "$GITHUB_ACTION_PATH/expand-workspace-vars.sh"
+        # Both inputs accept several whitespace-separated values, so an
+        # allowlisted name resolving to a path carrying whitespace
+        # splits one value into two wherever it lands. A runner with
+        # such a workspace path cannot express the value at all; name
+        # the problem rather than let the CLI fail on a mangled path.
+        # Matching uses the same reference forms the expansion consumes
+        # -- ${NAME} exactly, or $NAME at an identifier boundary -- so
+        # literal text such as label=GITHUB_WORKSPACE, or a distinct
+        # name sharing the prefix, draws no warning.
+        for _name in GITHUB_WORKSPACE GITHUB_REPOSITORY GITHUB_REF_NAME \
+          GITHUB_SHA GITHUB_RUN_ID RUNNER_TEMP RUNNER_OS; do
+          # Joined with a newline: the inputs expand independently, so a
+          # reference ending one must not run into the start of the
+          # other and read as a longer identifier.
+          _both="$ADVANCED_PROPERTIES"$'\n'"$SCAN_TARGETS"
+          if [[ "$_both" == *"\${$_name}"* ]] \
+            || [[ "$_both" =~ \$$_name([^A-Za-z0-9_]|$) ]]; then
+            case "${!_name-}" in
+              *[[:space:]]*)
+                echo "::warning::$_name holds whitespace, so a value" \
+                  "built from it splits into more than one value." \
+                  "Use a path without whitespace."
+                ;;
+            esac
+          fi
+        done
+        ADVANCED_PROPERTIES="$(expand_workspace_vars "$ADVANCED_PROPERTIES")"
+        SCAN_TARGETS="$(expand_workspace_vars "$SCAN_TARGETS")"
+        # advanced_properties accepts one pair per line, so use the
+        # multiline (delimiter) output form; a newline in the value must
+        # not break the output file or inject extra outputs. printf
+        # rather than echo for the values: echo reads option-shaped
+        # values such as '-n' as its own flags and mangles them.
+        DELIM="EXPAND_EOF_${RANDOM}${RANDOM}"
+        {
+          printf '%s\n' "advanced_properties<<${DELIM}"
+          printf '%s\n' "$ADVANCED_PROPERTIES"
+          printf '%s\n' "${DELIM}"
+          printf '%s\n' "scan_targets<<${DELIM}"
+          printf '%s\n' "$SCAN_TARGETS"
+          printf '%s\n' "${DELIM}"
+        } >> "$GITHUB_OUTPUT"
+
     - name: 'Run Sonatype CLI'
       # yamllint disable-line rule:line-length
       uses: sonatype/actions/run-iq-cli@18335e91b476ad0f0a7c68bec3f1445e70d8f5fc # v1.14.0
@@ -181,9 +248,9 @@ runs:
         username: ${{ inputs.nexus_iq_username }}
         password: ${{ inputs.nexus_iq_password }}
         application-id: ${{ inputs.application_id }}
-        scan-targets: ${{ inputs.scan_targets }}
+        scan-targets: ${{ steps.expand.outputs.scan_targets }}
         ignore-scanning-errors: ${{ inputs.ignore_scanning_errors }}
         ignore-system-errors: ${{ inputs.ignore_system_errors }}
         fail-on-policy-warnings: ${{ inputs.fail_on_policy_warnings }}
-        advanced-properties: ${{ inputs.advanced_properties }}
+        advanced-properties: ${{ steps.expand.outputs.advanced_properties }}
         debug: ${{ inputs.debug }}
