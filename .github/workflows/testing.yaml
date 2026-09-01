@@ -8,8 +8,11 @@ name: 'Test GitHub Action 🧪'
 # yamllint disable-line rule:truthy
 on:
   workflow_dispatch:
-  # Testing this action on pull requests will fail
-  # Since required credentials are not available
+  # The scan job needs credentials, which pull requests raised from a
+  # fork never receive, so it gates on the event type and only the
+  # credential-free expansion job runs for a pull request.
+  pull_request:
+    branches: ['main']
   push:
     branches: ['main']
 
@@ -20,9 +23,32 @@ concurrency:
 permissions: {}
 
 jobs:
+  ### Workspace-variable expansion allowlist ###
+  test-workspace-expansion:
+    name: 'Test Workspace Expansion'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The set of names the action expands is a security boundary: the
+      # calling step's environment can hold credentials. Needs no
+      # credentials itself, so it runs on pull requests, where the scan
+      # job cannot.
+      - name: 'Check the workspace-variable expansion'
+        shell: bash
+        run: ./tests/expand-workspace-vars.sh
+
   ### Test the GitHub Action in this Repository ###
   tests:
     name: 'Test local GitHub Action'
+    # Requires organisation credentials; unavailable to pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: 'ubuntu-latest'
     # Run this job in a dedicated environment so its execution and any
     # environment-scoped secrets can be gated by environment protection
