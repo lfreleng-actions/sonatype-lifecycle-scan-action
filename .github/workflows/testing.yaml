@@ -97,7 +97,7 @@ jobs:
           SECRET_NEXUS_IQ_PASSWORD: ${{ secrets.NEXUS_IQ_PASSWORD }}
 
       - name: "Running local action: ${{ github.repository }}"
-        uses: ./
+        uses: $/
         with:
           no_checkout: 'true'
           nexus_iq_server: "${{ vars.NEXUS_IQ_SERVER }}"
