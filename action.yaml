@@ -147,7 +147,7 @@ runs:
 
     - name: 'Setup Sonatype CLI'
       # yamllint disable-line rule:line-length
-      uses: sonatype/actions/setup-iq-cli@b1c823a70e98d3c67478cd72c0128712623455b9 # v1.14.1
+      uses: sonatype/actions/setup-iq-cli@bb9a9c738185a00853c399df3e54e3c11d4ea3b1 # v1.15.0
       with:
         iq-cli-version: ${{ inputs.iq_cli_version }}
 
