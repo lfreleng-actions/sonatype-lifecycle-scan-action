@@ -102,6 +102,6 @@ jobs:
           no_checkout: 'true'
           nexus_iq_server: "${{ vars.NEXUS_IQ_SERVER }}"
           nexus_iq_username: "${{ vars.NEXUS_IQ_USERNAME }}"
-          nexus_iq_password: "${{ secrets.NEXUS_IQ_PASSWORD }}"
+          nexus_iq_password: ${{ secrets.NEXUS_IQ_PASSWORD }}
           application_id: 'lfreleng-actions-sonatype-lifecycle-scan-action'
           debug: 'true'
