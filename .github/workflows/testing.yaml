@@ -44,6 +44,12 @@ jobs:
         shell: bash
         run: ./tests/expand-workspace-vars.sh
 
+      # Result files of every shape run-iq-cli leaves, and hostile text
+      # in them, rendered without a Nexus IQ server.
+      - name: 'Check the job summary rendering'
+        shell: bash
+        run: bash tests/write-scan-summary.sh
+
   ### Test the GitHub Action in this Repository ###
   tests:
     name: 'Test local GitHub Action'
@@ -97,6 +103,7 @@ jobs:
           SECRET_NEXUS_IQ_PASSWORD: ${{ secrets.NEXUS_IQ_PASSWORD }}
 
       - name: "Running local action: ${{ github.repository }}"
+        id: scan
         uses: $/
         with:
           no_checkout: 'true'
@@ -104,4 +111,27 @@ jobs:
           nexus_iq_username: "${{ vars.NEXUS_IQ_USERNAME }}"
           nexus_iq_password: ${{ secrets.NEXUS_IQ_PASSWORD }}
           application_id: 'lfreleng-actions-sonatype-lifecycle-scan-action'
+          # Opt in to the artifact path; the default skips it
+          summary: 'full'
           debug: 'true'
+
+      - name: 'Check action outputs'
+        shell: bash
+        env:
+          CLI_EXIT_CODE: ${{ steps.scan.outputs.cli_exit_code }}
+          CLI_EXIT_CATEGORY: ${{ steps.scan.outputs.cli_exit_category }}
+          SCAN_ID: ${{ steps.scan.outputs.scan_id }}
+          REPORT_URL: ${{ steps.scan.outputs.report_url }}
+        run: |
+          # Check action outputs
+          set -euo pipefail
+          echo "cli_exit_code: ${CLI_EXIT_CODE}"
+          echo "cli_exit_category: ${CLI_EXIT_CATEGORY}"
+          echo "scan_id: ${SCAN_ID}"
+          echo "report_url: ${REPORT_URL}"
+          if [ "$CLI_EXIT_CODE" != '0' ] || [ -z "$SCAN_ID" ] \
+            || [ -z "$REPORT_URL" ]; then
+            echo "Error: a passing scan left an output empty ❌"
+            exit 1
+          fi
+          echo "Action outputs are set ✅"

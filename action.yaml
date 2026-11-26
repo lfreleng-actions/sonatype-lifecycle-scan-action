@@ -86,11 +86,40 @@ inputs:
     required: false
     default: '.'
     # type: string
+  summary:
+    description: >-
+      What to write to the job summary: 'outcome' (the outcome table
+      alone), 'full' (outcome, component count, alerts per threat band
+      and the highest-threat alerts; uploads the result as an artifact,
+      and a failed upload fails the scan) or 'none'
+    required: false
+    default: 'outcome'
+    # type: string
   debug:
     description: 'Enable debugging output'
     required: false
     default: 'false'
     # type: boolean
+
+outputs:
+  scan_id:
+    description: 'ID of the scan; set only when the CLI produced a result'
+    value: ${{ steps.scan.outputs.scan-id }}
+  report_url:
+    description: 'URL of the IQ policy evaluation report'
+    value: ${{ steps.scan.outputs.report-url }}
+  priorities_url:
+    description: 'URL of the IQ application priorities, where returned'
+    value: ${{ steps.scan.outputs.priorities-url }}
+  cli_exit_code:
+    description: 'Exit code of the Nexus IQ CLI'
+    value: ${{ steps.scan.outputs.cli-exit-code }}
+  cli_exit_category:
+    description: 'Exit category of the Nexus IQ CLI, e.g. POLICY_VIOLATION'
+    value: ${{ steps.scan.outputs.cli-exit-category }}
+  cli_exit_message:
+    description: 'Exit message of the Nexus IQ CLI'
+    value: ${{ steps.scan.outputs.cli-exit-message }}
 
 runs:
   using: 'composite'
@@ -103,6 +132,7 @@ runs:
         IQ_CLI_VERSION: ${{ inputs.iq_cli_version }}
         APPLICATION_ID: ${{ inputs.application_id }}
         SCAN_TARGETS: ${{ inputs.scan_targets }}
+        SUMMARY: ${{ inputs.summary }}
         DEBUG: ${{ inputs.debug }}
         NEXUS_IQ_SERVER: ${{ inputs.nexus_iq_server }}
         NEXUS_IQ_USERNAME: ${{ inputs.nexus_iq_username }}
@@ -114,6 +144,7 @@ runs:
         echo "IQ CLI Version: $IQ_CLI_VERSION"
         echo "Application ID: $APPLICATION_ID"
         echo "Scan Targets: $SCAN_TARGETS"
+        echo "Job Summary: $SUMMARY"
         echo "Debug Mode: $DEBUG"
 
         echo "Verifying mandatory inputs 💬"
@@ -136,8 +167,15 @@ runs:
           echo "Nexus IQ Password not provided as input"
           error='true'
         fi
+        case "$SUMMARY" in
+          outcome | full | none) ;;
+          *)
+            echo "Invalid summary: expected outcome, full or none"
+            error='true'
+            ;;
+        esac
         if [ "$error" = 'true' ]; then
-          echo "Error: one or more mandatory inputs are missing"
+          echo "Error: one or more inputs are missing or invalid"
           echo "Check variables/secrets are set in Org/repository"
           echo "Provide all required inputs to the action ❌"
           exit 1
@@ -240,7 +278,39 @@ runs:
           printf '%s\n' "${DELIM}"
         } >> "$GITHUB_OUTPUT"
 
+    # run-iq-cli deletes the CLI's result file before its step ends, so
+    # the only way a later step can read it is the artifact run-iq-cli
+    # uploads when given a name. A clash with another upload in the run
+    # fails that upload and with it the scan, so the name carries the
+    # run, the attempt, the job and a random part: two jobs of one run,
+    # matrix legs, reusable-workflow calls and two calls in one job all
+    # differ.
+    - name: 'Name the scan result artifact'
+      id: artifact
+      if: inputs.summary == 'full'
+      # Failing here leaves the name empty: the scan runs without the
+      # artifact and the summary says the details are unavailable.
+      continue-on-error: true
+      shell: bash
+      env:
+        RUN_ID: ${{ github.run_id }}
+        RUN_ATTEMPT: ${{ github.run_attempt }}
+        JOB_ID: ${{ github.job }}
+        TEMP_DIR: ${{ runner.temp }}
+      run: |
+        # Name the scan result artifact
+        set -euo pipefail
+        rand="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+        # run-iq-cli accepts only ^[.a-zA-Z0-9_-]*$
+        job="$(printf '%s' "$JOB_ID" | tr -c 'a-zA-Z0-9_-' '_' | cut -c1-60)"
+        name="sonatype-iq-result-${RUN_ID}-${RUN_ATTEMPT}-${job}-${rand}"
+        {
+          printf 'name=%s\n' "$name"
+          printf 'dir=%s\n' "${TEMP_DIR}/${name}"
+        } >> "$GITHUB_OUTPUT"
+
     - name: 'Run Sonatype CLI'
+      id: scan
       # yamllint disable-line rule:line-length
       uses: sonatype/actions/run-iq-cli@8c4abefc47a5f0f8dd124f0bb60e48aafec7b2de # v1.16.0
       with:
@@ -253,4 +323,40 @@ runs:
         ignore-system-errors: ${{ inputs.ignore_system_errors }}
         fail-on-policy-warnings: ${{ inputs.fail_on_policy_warnings }}
         advanced-properties: ${{ steps.expand.outputs.advanced_properties }}
+        # Empty unless summary is 'full': no artifact is uploaded then
+        result-file: ${{ steps.artifact.outputs.name }}
         debug: ${{ inputs.debug }}
+
+    # The summary steps report the scan and never change its result:
+    # they run whether the scan passed or failed, and neither can fail
+    # the action. They receive no credentials.
+    - name: 'Download scan result'
+      id: download
+      if: >-
+        !cancelled() && inputs.summary == 'full'
+        && steps.scan.outcome != 'skipped'
+        && steps.artifact.outputs.name != ''
+      continue-on-error: true
+      # yamllint disable-line rule:line-length
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ steps.artifact.outputs.dir }}
+
+    - name: 'Write job summary'
+      if: >-
+        !cancelled() && inputs.summary != 'none'
+        && steps.scan.outcome != 'skipped'
+      continue-on-error: true
+      shell: bash
+      env:
+        SUMMARY_MODE: ${{ inputs.summary }}
+        APPLICATION_ID: ${{ inputs.application_id }}
+        CLI_EXIT_CATEGORY: ${{ steps.scan.outputs.cli-exit-category }}
+        CLI_EXIT_MESSAGE: ${{ steps.scan.outputs.cli-exit-message }}
+        SCAN_ID: ${{ steps.scan.outputs.scan-id }}
+        RESULT_DOWNLOAD: ${{ steps.download.outcome }}
+        RESULT_DIR: ${{ steps.artifact.outputs.dir }}
+      run: |
+        # Write job summary
+        bash "$GITHUB_ACTION_PATH/write-scan-summary.sh"
